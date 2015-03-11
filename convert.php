@@ -1,11 +1,12 @@
 <?php
 
 class Converter {
+
     // Print a usage message
     function printUsage($argv){
         $space = function($i){
             $spc = "";
-            foreach(range(0,$i) as $notUsed){
+            foreach(range(0,$i) as $unused){
                 $spc .= " ";
             }
             return $spc;
@@ -22,13 +23,15 @@ class Converter {
         $str .= sprintf("%starget%sdirectory into which converted files will be saved\n", $ind, $buf('target'));
         $str .= sprintf("%swidth%starget resize width; calculated if entered as 0; ignored if both dimensions are 0.\n", $ind, $buf('width'));
         $str .= sprintf("%sheight%starget resize height; calculated if entered as 0; ignored if both dimensions are 0.\n", $ind, $buf('height'));
-        $str .= sprintf("%squality%starget compression quality 1-100.\n\n", $ind, $buf('quality'));
+        $str .= sprintf("%squality%starget compression quality 1-100.\n", $ind, $buf('quality'));
+        $str .= sprintf("%sformat%starget output file format (jp2, tiff, etc).\n", $ind, $buf('format'));
+        $str .= sprintf("%sindex%simage index - required for multi-image input files.\n", $ind, $buf('index'));
         print $str;
     }
 
-    public $src, $target, $width, $height, $quality, $windows, $executable, $command, $index;
+    public $src, $target, $width, $height, $quality, $windows, $executable, $command, $index, $outputFormat;
 
-    public $argsRequired = 6;
+    public $argsRequired = 7;
 
     public function __construct($argv){
 
@@ -47,8 +50,11 @@ class Converter {
         // Quality (1-100);
         $this->quality = $argv[5];
 
+        // output file format
+        $this->outputFormat = isset($argv[6]) ? $argv[6] : 'jp2';
+
         // multipage image index
-        $this->index = !isset($argv[6]) ? null : $argv[6];
+        $this->index = !isset($argv[6]) ? null : $argv[7];
 
         // Setup environment-dependent properties.
         defined('DS') ? null : define('DS', DIRECTORY_SEPARATOR);
@@ -65,7 +71,7 @@ class Converter {
         if(null === $this->index){
             $fileInfo = array();
             exec($this->identify ." -quiet  ". $this->escapePath($file->getRealPath()), $fileInfo);
-            var_dump($fileInfo);
+
             if(count($fileInfo > 1)){
                 $str  = sprintf("\nMultipage input image present: %s\n", $file->getRealPath());
                 $str .= sprintf("Please specify the index of the image to convert\n");
@@ -88,9 +94,13 @@ class Converter {
     function processDir(SplFileInfo $src, SplFileInfo $target){
         printf("Processing directory %s\n", $src->getRealPath());
 
+        if(!file_exists($target->getPathname())){
+            printf("Creating missing target directory %s\n", $target->getPathname());
+            mkdir($target->getPathname());
+        }
+
         foreach(scandir($src->getRealPath()) as $file){
             $file = new SplFileInfo($src->getRealPath().DS.$file);
-
 
             // Do not try to process '.' and '..' directories.
             if($file->getFileName() === '.' || $file->getFileName() === '..'){
@@ -100,13 +110,11 @@ class Converter {
 
             // Recurse into subdirectories.
             if($file->isDir()){
-                $subtarget = new SplFileInfo($target->getRealPath().DS.$file->getFilename());
 
-                // Create target subdirectory.
-                mkdir($subtarget->getRealPath());
-
-                // Recursive call.
+                printf("Descending into sub-directory %s\n", $file->getPathname());
+                $subtarget = new SplFileInfo($target->getPathname().DS.$file->getFilename());
                 $this->processDir($file, $subtarget);
+
                 continue;
             }
 
@@ -121,7 +129,7 @@ class Converter {
             $this->testMultipageInput($file);
         
             //$newPath = $target.'/'.baseFilename($file).'.jp2';
-            $newPath = sprintf("%s%s%s.jp2", $target->getRealPath(), DS, $this->baseFilename($file));
+            $newPath = sprintf("%s%s%s.%s", $target->getRealPath(), DS, $this->baseFilename($file), $this->outputFormat);
 
             // Print message and start timer.
             printf("Processing %s\n", $file->getRealPath());
