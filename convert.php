@@ -26,7 +26,9 @@ class Converter {
         print $str;
     }
 
-    public $src, $target, $width, $height, $quality, $windows, $executable, $command;
+    public $src, $target, $width, $height, $quality, $windows, $executable, $command, $index;
+
+    public $argsRequired = 6;
 
     public function __construct($argv){
 
@@ -45,16 +47,37 @@ class Converter {
         // Quality (1-100);
         $this->quality = $argv[5];
 
+        // multipage image index
+        $this->index = !isset($argv[6]) ? null : $argv[6];
+
         // Setup environment-dependent properties.
         defined('DS') ? null : define('DS', DIRECTORY_SEPARATOR);
         $this->windows    = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
         $this->executable = $this->windows ? 'converte.exe.' : 'convert';
+        $this->identify   = $this->windows ? 'identify.exe.' : 'identify';
 
         // init command
         $dimensions = $this->width == '' && $this->height == '' ? '' : sprintf("-resize %sx%s", $this->width, $this->height);
         $this->command = sprintf("%s %%s[0] -depth 8 %s -quality %d -quiet %%s", $this->executable, $dimensions, $this->quality);
     }
 
+    public function testMultipageInput(SplFileInfo $file){
+        if(null === $this->index){
+            $fileInfo = array();
+            exec($this->identify ." -quiet  ". $this->escapePath($file->getRealPath()), $fileInfo);
+            var_dump($fileInfo);
+            if(count($fileInfo > 1)){
+                $str  = sprintf("\nMultipage input image present: %s\n", $file->getRealPath());
+                $str .= sprintf("Please specify the index of the image to convert\n");
+                $str .= sprintf("Possibilities are:\n");
+                foreach($fileInfo as $key => $info){
+                    $str .= sprintf("%s for %s\n", $key, $info);
+                }
+                print($str);
+                exit(0);
+            }
+        }
+    }
 
     /**
      * Main processing loop.
@@ -67,6 +90,7 @@ class Converter {
 
         foreach(scandir($src->getRealPath()) as $file){
             $file = new SplFileInfo($src->getRealPath().DS.$file);
+
 
             // Do not try to process '.' and '..' directories.
             if($file->getFileName() === '.' || $file->getFileName() === '..'){
@@ -94,6 +118,7 @@ class Converter {
                 continue;
             }
 
+            $this->testMultipageInput($file);
         
             //$newPath = $target.'/'.baseFilename($file).'.jp2';
             $newPath = sprintf("%s%s%s.jp2", $target->getRealPath(), DS, $this->baseFilename($file));
@@ -146,9 +171,9 @@ class Converter {
 }
 
 
-$converter = new Converter($argv, $command);
+$converter = new Converter($argv);
 
-if(count($argv) === 1){
+if(count($argv) < $converter->argsRequired){
     $converter->printUsage($argv);
     exit(0);
 }
