@@ -120,11 +120,11 @@ class Converter {
 
             // Don't process anything other than tiffs.
             // TODO let input format be user-defined.
-            if(substr($file->getExtension(), 0, 3) !== 'tif'){
-                printf("Extension %s\n", substr($file->getExtension(), 0, 3));
-                printf("Skipping non-TIFF file %s\n", $file->getFilename());
-                continue;
-            }
+            //            if(substr($file->getExtension(), 0, 3) !== 'tif'){
+            //  printf("Extension %s\n", substr($file->getExtension(), 0, 3));
+            //    printf("Skipping non-TIFF file %s\n", $file->getFilename());
+            //    continue;
+            // }
 
             $this->testMultipageInput($file);
         
